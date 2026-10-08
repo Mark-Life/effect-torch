@@ -379,6 +379,73 @@ onDevices("Tensor", (device) => (it) => {
       }))
   })
 
+  describe("graphSnapshot", () => {
+    const matrix = Tensor.fromTypedArray(new Float32Array([1, 2, 3, 4, 5, 6]), [2, 3])
+
+    const assertPostorder = (snapshot: Runtime.GraphSnapshot) => {
+      const seen = new Set<number>()
+      for (const node of snapshot.nodes) {
+        for (const input of node.inputs) {
+          assert.assertTrue(seen.has(input), `input ${input} of ${node.op} precedes it`)
+        }
+        assert.assertFalse(seen.has(node.id))
+        seen.add(node.id)
+      }
+    }
+
+    it.effect("captures ops, shapes, dtypes, and exposes in postorder", () =>
+      Effect.gen(function*() {
+        const a = yield* matrix
+        const root = yield* Tensor.expose(yield* Tensor.mul(yield* Tensor.add(a, a), a), "h")
+        const snapshot = yield* Tensor.graphSnapshot([root])
+        assert.strictEqual(snapshot.nodes.length, 4)
+        assertPostorder(snapshot)
+        deep(snapshot.roots, [snapshot.nodes[3]!.id])
+        deep(snapshot.nodes.slice(1).map((node) => node.op), ["add", "mul", "expose"])
+        for (const node of snapshot.nodes) {
+          deep(node.shape, [2, 3])
+          assert.strictEqual(node.dtype, "f32")
+        }
+        const add = snapshot.nodes[1]!
+        deep(add.inputs, [snapshot.nodes[0]!.id, snapshot.nodes[0]!.id])
+        deep(snapshot.nodes.filter((node) => node.exposeName === "h").length, 1)
+        assert.assertTrue(Object.isFrozen(snapshot.nodes))
+      }))
+
+    it.effect("includes backward nodes of gradient graphs", () =>
+      Effect.gen(function*() {
+        const x = yield* matrix
+        const loss = yield* Tensor.sum(yield* Tensor.mul(yield* Tensor.exp(x), x))
+        const [gradX] = yield* Gradient.grad(loss, [x])
+        const forward = yield* Tensor.graphSnapshot([loss])
+        const snapshot = yield* Tensor.graphSnapshot([loss, gradX!])
+        assertPostorder(snapshot)
+        assert.strictEqual(snapshot.roots.length, 2)
+        assert.assertTrue(snapshot.nodes.length > forward.nodes.length)
+      }))
+
+    it.effect("fails with TensorError when the runtime lacks graph snapshots", () =>
+      Effect.gen(function*() {
+        const runtime = yield* Runtime.Runtime
+        const a = yield* matrix
+        const exit = yield* Effect.exit(
+          Tensor.graphSnapshot([a]).pipe(
+            Effect.provideService(Runtime.Runtime, { ...runtime, graphSnapshot: undefined })
+          )
+        )
+        assert.assertTrue(Exit.isFailure(exit))
+        const error = yield* Effect.flip(
+          Tensor.graphSnapshot([a]).pipe(
+            Effect.provideService(Runtime.Runtime, { ...runtime, graphSnapshot: undefined })
+          )
+        )
+        assert.strictEqual(error._tag, "TensorError")
+        assert.strictEqual(error.op, "graphSnapshot")
+        const empty = yield* Effect.flip(Tensor.graphSnapshot([]))
+        assert.strictEqual(empty.op, "graphSnapshot")
+      }))
+  })
+
   describe("composition", () => {
     it.effect("matmul(eye) roundtrip and deep chains compute once", () =>
       Effect.gen(function*() {

@@ -2315,6 +2315,31 @@ export const expose: {
 )
 
 /**
+ * Captures the structure of the lazy graph reachable from `roots` without
+ * executing it. Concrete roots appear as `leaf` nodes. Fails when `roots` is
+ * empty or the runtime does not support graph snapshots.
+ *
+ * @since 0.1.0
+ * @category graph operations
+ */
+export const graphSnapshot = (
+  roots: ReadonlyArray<Any>
+): Effect.Effect<Runtime.GraphSnapshot, TensorError, Runtime.Runtime> =>
+  Effect.gen(function*() {
+    const runtime = yield* Runtime.Runtime
+    if (runtime.graphSnapshot === undefined) {
+      return yield* new TensorError({
+        op: "graphSnapshot",
+        message: `graphSnapshot: runtime ${runtime.backend.name} does not support graph snapshots`
+      })
+    }
+    if (roots.length === 0) {
+      return yield* new TensorError({ op: "graphSnapshot", message: "graphSnapshot: roots must be nonempty" })
+    }
+    return yield* fromBackend("graphSnapshot", runtime.graphSnapshot(roots))
+  })
+
+/**
  * Concatenates two or more tensors along an existing dimension. All tensors
  * must have the same rank, dtype and exact placement, and match on every
  * dimension except the concatenated one.
@@ -4316,12 +4341,26 @@ export interface CompiledFn<E = never, R = never> {
   ) => Effect.Effect<Array<Concrete>, TensorError | E, Runtime.Runtime | R>
   /** Snapshot of current entries and cumulative trace attempts. */
   readonly stats: Effect.Effect<CompileStats>
+  /** Diagnostics of ready programs in LRU order, most recently used last. */
+  readonly diagnostics: Effect.Effect<ReadonlyArray<ProgramDiagnostics>>
   /**
    * Drops this function's JavaScript cache entries and signature history only;
    * native structural and pipeline caches are unaffected. An already in-flight
    * trace may insert its result afterwards.
    */
   readonly clear: Effect.Effect<void>
+}
+
+/**
+ * Compile diagnostics of one cached program.
+ *
+ * @since 0.1.0
+ * @category compilation
+ */
+export interface ProgramDiagnostics {
+  /** Cache key from {@link signatureOf}: runtime identity plus input metadata. */
+  readonly signature: string
+  readonly diagnostics: Runtime.ExecutableDiagnostics
 }
 
 /**
@@ -4353,6 +4392,8 @@ export interface ProgramCache {
   warned: boolean
   /** Snapshot of current entries and cumulative trace attempts. */
   readonly stats: Effect.Effect<CompileStats>
+  /** Ready entries in LRU order, most recently used last. Pending entries are skipped. */
+  readonly diagnostics: Effect.Effect<ReadonlyArray<ProgramDiagnostics>>
   /**
    * Drops current JavaScript entries and signature history; an in-flight trace
    * may repopulate the cache. Native caches and the cumulative trace count are
@@ -4391,6 +4432,13 @@ export const makeProgramCache = (capacity: number = 32): ProgramCache => {
     warned: false,
     get stats() {
       return Effect.sync(() => ({ cached: cache.entries.size, compiled: cache.compiled }))
+    },
+    get diagnostics() {
+      return Effect.sync(() =>
+        Array.from(cache.entries).flatMap(([signature, entry]) =>
+          entry._tag === "ready" ? [{ signature, diagnostics: entry.program.handle.diagnostics }] : []
+        )
+      )
     },
     get clear() {
       return Effect.sync(() => {
@@ -6155,6 +6203,9 @@ export const compile = <E = never, R = never>(
         }),
       get stats() {
         return cache.stats
+      },
+      get diagnostics() {
+        return cache.diagnostics
       },
       get clear() {
         return cache.clear

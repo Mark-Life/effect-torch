@@ -123,6 +123,9 @@ export declare function externalMemoryBytes(): number
 /** Reverse-mode gradients of `loss` with respect to each tensor in `wrt`. */
 export declare function grad(loss: LazyTensor, wrt: Array<LazyTensor>): Array<LazyTensor>
 
+/** JSON snapshot of the lazy graph reachable from `roots`. Executes nothing. */
+export declare function graphSnapshot(roots: Array<LazyTensor>): string
+
 export declare function inspectGguf(path: string, token?: CancellationToken | undefined | null): Promise<NativeGgufInspection>
 
 /**

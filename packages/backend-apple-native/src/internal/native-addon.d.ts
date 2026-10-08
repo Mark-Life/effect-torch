@@ -210,6 +210,9 @@ export declare function externalMemoryBytesForDevice(deviceOrdinal: number): num
 
 export declare function grad(loss: LazyTensor, wrt: Array<LazyTensor>): Array<LazyTensor>
 
+/** JSON snapshot of the lazy graph reachable from `roots`. Executes nothing. */
+export declare function graphSnapshot(roots: Array<LazyTensor>): string
+
 /** Parses and validates a GGUF file without loading tensor payloads. */
 export declare function inspectGguf(path: string, token?: CancellationToken | undefined | null): Promise<NativeGgufInspection>
 

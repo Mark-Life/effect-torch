@@ -280,6 +280,11 @@ export interface Trainer<S, EL = never, RL = never, ED = never, RD = never, EO =
    */
   readonly stats: Effect.Effect<Tensor.CompileStats>
   /**
+   * Compile diagnostics of the ready cached step programs, most recently used
+   * last. Uncompiled trainers always report an empty array.
+   */
+  readonly diagnostics: Effect.Effect<ReadonlyArray<Tensor.ProgramDiagnostics>>
+  /**
    * Drops JavaScript cached-program references and signature history; it does
    * not clear tensors, native structural or pipeline caches, or the cumulative
    * trace count. A later step retraces, although an already in-flight trace may
@@ -314,6 +319,9 @@ export const make = <S, EL = never, RL = never, ED = never, RD = never, EO = nev
       get stats() {
         return cache.stats
       },
+      get diagnostics() {
+        return cache.diagnostics
+      },
       get clear() {
         return cache.clear
       }
@@ -339,6 +347,7 @@ export const makeUncompiled = <S, EL = never, RL = never, ED = never, RD = never
     config,
     train: (params, resume) => trainLoop(model, config, params, resume, undefined),
     stats: Effect.succeed({ cached: 0, compiled: 0 }),
+    diagnostics: Effect.succeed([]),
     clear: Effect.void
   })
 

@@ -2163,6 +2163,14 @@ impl LazyTensor {
     }
 }
 
+/// JSON snapshot of the lazy graph reachable from `roots`. Executes nothing.
+#[napi]
+pub fn graph_snapshot(roots: Vec<&LazyTensor>) -> Result<String> {
+    let nodes: Vec<_> = roots.iter().map(|tensor| tensor.node.clone()).collect();
+    effect_torch_compiler::graph_snapshot_json(&nodes)
+        .map_err(|message| Error::new(Status::InvalidArg, message))
+}
+
 #[napi]
 pub fn grad(loss: &LazyTensor, wrt: Vec<&LazyTensor>) -> Result<Vec<LazyTensor>> {
     let targets: Vec<Arc<Node>> = wrt.iter().map(|t| t.node.clone()).collect();

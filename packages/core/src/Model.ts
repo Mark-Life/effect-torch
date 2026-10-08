@@ -226,6 +226,8 @@ export interface Program {
     input: Tensor.Any
   ) => Effect.Effect<Tensor.Concrete, ModelError | Tensor.TensorError, Runtime.Runtime>
   readonly stats: Effect.Effect<Tensor.CompileStats>
+  /** Compile diagnostics of the ready cached programs. */
+  readonly diagnostics: Effect.Effect<ReadonlyArray<Tensor.ProgramDiagnostics>>
   readonly clear: Effect.Effect<void>
 }
 
@@ -404,6 +406,9 @@ export const compile = (
       run: (input) => Effect.map(fn.call([...parameters, input]), ([output]) => output),
       get stats() {
         return fn.stats
+      },
+      get diagnostics() {
+        return fn.diagnostics
       },
       get clear() {
         return fn.clear

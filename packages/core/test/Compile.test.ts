@@ -117,6 +117,21 @@ onDevices("Compile", (device) => (it) => {
         }
       }))
 
+    it.effect("reports diagnostics per ready signature", () =>
+      Effect.gen(function*() {
+        const fn = yield* Tensor.compile(([a]) => Effect.map(Tensor.neg(a), (out) => [out]))
+        expect(yield* fn.diagnostics).toEqual([])
+        yield* fn.call([yield* Tensor.fromTypedArray(floats([1, 2]), [2])])
+        const first = yield* fn.diagnostics
+        expect(first).toHaveLength(1)
+        expect(first[0]!.diagnostics.instructions.length).toBeGreaterThan(0)
+        expect(first[0]!.signature.length).toBeGreaterThan(0)
+        yield* fn.call([yield* Tensor.fromTypedArray(floats([1, 2, 3]), [3])])
+        const second = yield* fn.diagnostics
+        expect(second).toHaveLength(2)
+        expect(new Set(second.map(({ signature }) => signature)).size).toBe(2)
+      }))
+
     it.effect("traces once under concurrent first calls (single-flight)", () =>
       Effect.gen(function*() {
         const fn = yield* Tensor.compile(([a]) => Effect.map(Tensor.neg(a), (out) => [out]))
@@ -349,6 +364,18 @@ onDevices("Compile", (device) => (it) => {
         expect((yield* program.stats).cached).toBe(1)
         yield* program.clear
         expect(yield* program.stats).toEqual({ cached: 0, compiled: 1 })
+      }))
+
+    it.effect("forwards program diagnostics", () =>
+      Effect.gen(function*() {
+        const model = yield* mlp
+        const params = yield* Tensor.compute(yield* Model.initialize(model))
+        const program = yield* Model.compile(model, params)
+        expect(yield* program.diagnostics).toEqual([])
+        yield* program.run(yield* Tensor.fromTypedArray(floats([0, 1, 1, 0]), [2, 2]))
+        const diagnostics = yield* program.diagnostics
+        expect(diagnostics).toHaveLength(1)
+        expect(diagnostics[0]!.diagnostics.instructions.length).toBeGreaterThan(0)
       }))
 
     it.effect("trains under a compiled trainer", () =>

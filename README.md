@@ -603,6 +603,20 @@ one token from a concrete rank-one floating logits tensor. The scoped clear
 helpers register caller-owned handles for cleanup when an Effect scope closes;
 library code should still release temporary handles at the operation boundary.
 
+### Graph inspection
+
+```text
+expose              graphSnapshot
+```
+
+`expose` names a tensor with an identity node. Execution, autodiff, and
+compilation treat the node as transparent. `graphSnapshot` returns the lazy
+graph reachable from its roots as plain data and executes nothing. Each node
+has an id, an op name, a shape, a dtype, input ids in operand order, and
+attributes. Concrete roots appear as `leaf` nodes. The built-in backends
+support it. Third-party runtimes may omit it, and the call then fails with
+`TensorError`.
+
 ### Losses
 
 `Loss` provides:
@@ -707,6 +721,11 @@ Compilation behavior:
 - Materializing a placeholder while tracing fails.
 
 `compiled.stats` reports the number of cached programs and total trace attempts.
+`compiled.diagnostics` returns one `ProgramDiagnostics` per ready cached
+program. Each entry holds an opaque signature string and the backend's
+`ExecutableDiagnostics`: semantic node counts, instructions by kind, pipeline,
+command, and synchronization counts, memory plan totals, and compile phase
+timings. `Model.compile` results expose the same `diagnostics`.
 `compiled.clear` drops cache references without resetting the trace count. Native
 programs are destroyed when normal handle reachability and finalization permit.
 
@@ -879,6 +898,10 @@ least one step and runs `onStep` before checking the stop policy.
 
 The compiled trainer releases parameter and state generations that it owns once
 their replacements commit.
+
+`trainer.diagnostics` returns the compile diagnostics of the cached step
+programs, in the same form as `compiled.diagnostics`. Uncompiled trainers
+return an empty array.
 
 ### Mixed BF16
 
