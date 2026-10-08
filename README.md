@@ -707,6 +707,11 @@ Compilation behavior:
 - Materializing a placeholder while tracing fails.
 
 `compiled.stats` reports the number of cached programs and total trace attempts.
+`compiled.diagnostics` returns one `ProgramDiagnostics` per ready cached
+program. Each entry holds an opaque signature string and the backend's
+`ExecutableDiagnostics`: semantic node counts, instructions by kind, pipeline,
+command, and synchronization counts, memory plan totals, and compile phase
+timings. `Model.compile` results expose the same `diagnostics`.
 `compiled.clear` drops cache references without resetting the trace count. Native
 programs are destroyed when normal handle reachability and finalization permit.
 
@@ -879,6 +884,10 @@ least one step and runs `onStep` before checking the stop policy.
 
 The compiled trainer releases parameter and state generations that it owns once
 their replacements commit.
+
+`trainer.diagnostics` returns the compile diagnostics of the cached step
+programs, in the same form as `compiled.diagnostics`. Uncompiled trainers
+return an empty array.
 
 ### Mixed BF16
 

@@ -4316,12 +4316,26 @@ export interface CompiledFn<E = never, R = never> {
   ) => Effect.Effect<Array<Concrete>, TensorError | E, Runtime.Runtime | R>
   /** Snapshot of current entries and cumulative trace attempts. */
   readonly stats: Effect.Effect<CompileStats>
+  /** Diagnostics of ready programs in LRU order, most recently used last. */
+  readonly diagnostics: Effect.Effect<ReadonlyArray<ProgramDiagnostics>>
   /**
    * Drops this function's JavaScript cache entries and signature history only;
    * native structural and pipeline caches are unaffected. An already in-flight
    * trace may insert its result afterwards.
    */
   readonly clear: Effect.Effect<void>
+}
+
+/**
+ * Compile diagnostics of one cached program.
+ *
+ * @since 0.1.0
+ * @category compilation
+ */
+export interface ProgramDiagnostics {
+  /** Cache key from {@link signatureOf}: runtime identity plus input metadata. */
+  readonly signature: string
+  readonly diagnostics: Runtime.ExecutableDiagnostics
 }
 
 /**
@@ -4353,6 +4367,8 @@ export interface ProgramCache {
   warned: boolean
   /** Snapshot of current entries and cumulative trace attempts. */
   readonly stats: Effect.Effect<CompileStats>
+  /** Ready entries in LRU order, most recently used last. Pending entries are skipped. */
+  readonly diagnostics: Effect.Effect<ReadonlyArray<ProgramDiagnostics>>
   /**
    * Drops current JavaScript entries and signature history; an in-flight trace
    * may repopulate the cache. Native caches and the cumulative trace count are
@@ -4391,6 +4407,13 @@ export const makeProgramCache = (capacity: number = 32): ProgramCache => {
     warned: false,
     get stats() {
       return Effect.sync(() => ({ cached: cache.entries.size, compiled: cache.compiled }))
+    },
+    get diagnostics() {
+      return Effect.sync(() =>
+        Array.from(cache.entries).flatMap(([signature, entry]) =>
+          entry._tag === "ready" ? [{ signature, diagnostics: entry.program.handle.diagnostics }] : []
+        )
+      )
     },
     get clear() {
       return Effect.sync(() => {
@@ -6155,6 +6178,9 @@ export const compile = <E = never, R = never>(
         }),
       get stats() {
         return cache.stats
+      },
+      get diagnostics() {
+        return cache.diagnostics
       },
       get clear() {
         return cache.clear

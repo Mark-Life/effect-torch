@@ -314,6 +314,25 @@ onDevices("Trainer", (device) => (it) => {
         expect(yield* trainer.stats).toEqual({ cached: 1, compiled: 1 })
       }))
 
+    it.effect("reports step program diagnostics", () =>
+      Effect.gen(function*() {
+        const model = yield* mlp
+        const config = {
+          optimizer: yield* Optimizer.adam(),
+          lr: LearningRate.constant(0.1),
+          loss: Loss.mse,
+          data: yield* xor,
+          stop: ({ step }: { readonly step: number }) => step >= 3
+        }
+        const trainer = yield* Trainer.make(model, config)
+        yield* trainer.train(yield* Model.initialize(trainer.model))
+        const diagnostics = yield* trainer.diagnostics
+        expect(diagnostics).toHaveLength(1)
+        expect(diagnostics[0]!.diagnostics.memory.peakLiveBytes).toBeGreaterThan(0)
+        const uncompiled = yield* Trainer.makeUncompiled(model, config)
+        expect(yield* uncompiled.diagnostics).toEqual([])
+      }))
+
     it.effect("recompiles when the batch signature changes", () =>
       Effect.gen(function*() {
         const model = yield* mlp
