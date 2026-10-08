@@ -42,6 +42,7 @@ mod planner;
 mod request;
 mod schedule;
 mod semantic;
+mod snapshot;
 #[cfg(test)]
 mod test_target;
 
@@ -58,6 +59,7 @@ pub use schedule::{
     DenseNodeId, GeneratedBinding, GraphIndex, GraphIndexWork, ProgramSlot, RandomSource,
     RandomSourceId, RandomSourceKind, RandomSourceMetadata,
 };
+pub use snapshot::*;
 
 #[cfg(test)]
 mod tests {

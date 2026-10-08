@@ -2315,6 +2315,31 @@ export const expose: {
 )
 
 /**
+ * Captures the structure of the lazy graph reachable from `roots` without
+ * executing it. Concrete roots appear as `leaf` nodes. Fails when `roots` is
+ * empty or the runtime does not support graph snapshots.
+ *
+ * @since 0.1.0
+ * @category graph operations
+ */
+export const graphSnapshot = (
+  roots: ReadonlyArray<Any>
+): Effect.Effect<Runtime.GraphSnapshot, TensorError, Runtime.Runtime> =>
+  Effect.gen(function*() {
+    const runtime = yield* Runtime.Runtime
+    if (runtime.graphSnapshot === undefined) {
+      return yield* new TensorError({
+        op: "graphSnapshot",
+        message: `graphSnapshot: runtime ${runtime.backend.name} does not support graph snapshots`
+      })
+    }
+    if (roots.length === 0) {
+      return yield* new TensorError({ op: "graphSnapshot", message: "graphSnapshot: roots must be nonempty" })
+    }
+    return yield* fromBackend("graphSnapshot", runtime.graphSnapshot(roots))
+  })
+
+/**
  * Concatenates two or more tensors along an existing dimension. All tensors
  * must have the same rank, dtype and exact placement, and match on every
  * dimension except the concatenated one.

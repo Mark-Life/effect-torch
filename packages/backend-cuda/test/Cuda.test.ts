@@ -354,6 +354,7 @@ it.effect("clears unpublished native outputs after interruption", () =>
       deviceCount: () => 1,
       externalMemoryBytes: () => 0,
       grad: () => [new LazyTensorDouble()],
+      graphSnapshot: () => JSON.stringify({ nodes: [], roots: [] }),
       isAvailable: () => true,
       inspectGguf: () => Promise.resolve({ metadata: [], tensors: [] }),
       inspectSafetensors: () => Promise.resolve({ entries: [], metadata: {} }),

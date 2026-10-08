@@ -603,6 +603,20 @@ one token from a concrete rank-one floating logits tensor. The scoped clear
 helpers register caller-owned handles for cleanup when an Effect scope closes;
 library code should still release temporary handles at the operation boundary.
 
+### Graph inspection
+
+```text
+expose              graphSnapshot
+```
+
+`expose` names a tensor with an identity node. Execution, autodiff, and
+compilation treat the node as transparent. `graphSnapshot` returns the lazy
+graph reachable from its roots as plain data and executes nothing. Each node
+has an id, an op name, a shape, a dtype, input ids in operand order, and
+attributes. Concrete roots appear as `leaf` nodes. The built-in backends
+support it. Third-party runtimes may omit it, and the call then fails with
+`TensorError`.
+
 ### Losses
 
 `Loss` provides:

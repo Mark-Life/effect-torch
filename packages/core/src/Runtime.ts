@@ -2226,6 +2226,57 @@ export interface NamedExposure {
 }
 
 /**
+ * JSON-safe attribute value on a {@link GraphSnapshotNode}.
+ *
+ * @since 0.1.0
+ * @category models
+ */
+export type GraphAttributeValue =
+  | number
+  | boolean
+  | string
+  | null
+  | ReadonlyArray<GraphAttributeValue>
+
+/**
+ * One semantic node in a {@link GraphSnapshot}.
+ *
+ * @since 0.1.0
+ * @category models
+ */
+export interface GraphSnapshotNode {
+  /** Process-unique semantic node id. */
+  readonly id: number
+  /** Stable operation name, e.g. `"matmul"`, `"expose"`, `"adam_w_step"`. */
+  readonly op: string
+  readonly shape: ReadonlyArray<number>
+  readonly dtype: DType
+  /** Input node ids in operand order. Duplicates are kept. */
+  readonly inputs: ReadonlyArray<number>
+  /**
+   * Operation attributes with camelCase keys. Non-finite floats are `"inf"`,
+   * `"-inf"`, or `"nan"`. Enums are camelCase strings; attention windows are
+   * `"inherit"`, `"full"`, or a row count. Multi-output selectors carry `index`.
+   */
+  readonly attributes: Readonly<Record<string, GraphAttributeValue>>
+  /** Present only when `op === "expose"`. */
+  readonly exposeName?: string
+}
+
+/**
+ * Structure of a lazy graph, captured without executing it.
+ *
+ * @since 0.1.0
+ * @category models
+ */
+export interface GraphSnapshot {
+  /** Deduplicated nodes in postorder: every input precedes its consumers. */
+  readonly nodes: ReadonlyArray<GraphSnapshotNode>
+  /** Root ids in caller order, duplicates kept. */
+  readonly roots: ReadonlyArray<number>
+}
+
+/**
  * A live tensor runtime bound to one default placement. Implementations are
  * responsible for native capability validation, immutable metadata, handle
  * ownership/liveness registries, interruption cleanup, and safe concurrent
@@ -2262,6 +2313,13 @@ export interface RuntimeService {
   readonly exposures: (
     root: LazyTensorHandle
   ) => Effect.Effect<ReadonlyArray<NamedExposure>, BackendError>
+  /**
+   * Walks the lazy graph reachable from `roots` without executing anything.
+   * Optional: third-party runtimes may omit it.
+   */
+  readonly graphSnapshot?:
+    | ((roots: ReadonlyArray<TensorHandle>) => Effect.Effect<GraphSnapshot, BackendError>)
+    | undefined
   /**
    * Builds lazy reverse-mode gradient graphs without materializing the loss.
    * Inputs are borrowed, must be live and runtime-owned, and output order must

@@ -23,6 +23,19 @@ import { register96 } from "./chain96.ts"
 import { type Chain97Request, register97 } from "./chain97.ts"
 import { registerRequestRng99 } from "./requestRng99.ts"
 
+const parseGraphSnapshot = (json: string) => {
+  const snapshot: Runtime.GraphSnapshot = JSON.parse(json)
+  for (const node of snapshot.nodes) {
+    Object.freeze(node.shape)
+    Object.freeze(node.inputs)
+    Object.freeze(node.attributes)
+    Object.freeze(node)
+  }
+  Object.freeze(snapshot.nodes)
+  Object.freeze(snapshot.roots)
+  return Object.freeze(snapshot)
+}
+
 const backendName = "@effect-torch/backend-cuda"
 
 interface TensorRecord {
@@ -2513,6 +2526,12 @@ export const createRuntimeAdapter = (native: NativeAddon, deviceOrdinal: number)
             tensor: lazyHandle(entry.tensor)
           })),
         catch: errorFor("exposures", "graph", "execution-failed")
+      }),
+    graphSnapshot: (roots) =>
+      Effect.try({
+        try: () =>
+          parseGraphSnapshot(native.graphSnapshot(roots.map((root) => handleRecord(root, "graphSnapshot").graph))),
+        catch: errorFor("graphSnapshot", "graph", "execution-failed")
       }),
     grad: (loss, wrt) =>
       Effect.try({

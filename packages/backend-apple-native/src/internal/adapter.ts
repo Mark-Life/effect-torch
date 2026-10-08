@@ -35,6 +35,19 @@ import type {
   NativeValueRef
 } from "./native-addon.js"
 
+const parseGraphSnapshot = (json: string) => {
+  const snapshot: Runtime.GraphSnapshot = JSON.parse(json)
+  for (const node of snapshot.nodes) {
+    Object.freeze(node.shape)
+    Object.freeze(node.inputs)
+    Object.freeze(node.attributes)
+    Object.freeze(node)
+  }
+  Object.freeze(snapshot.nodes)
+  Object.freeze(snapshot.roots)
+  return Object.freeze(snapshot)
+}
+
 type CancellationToken = InstanceType<NativeAddon["CancellationToken"]>
 
 type HandleKind =
@@ -3014,6 +3027,16 @@ export const createRuntimeAdapter = (
           }))
         },
         catch: backendErrorFor("exposures", "graph")
+      }),
+    graphSnapshot: (roots) =>
+      Effect.try({
+        try: () => {
+          pendingStructure = undefined
+          pendingDeclarations = undefined
+
+          return parseGraphSnapshot(native.graphSnapshot(roots.map((root) => nativeGraph(root, "graphSnapshot"))))
+        },
+        catch: backendErrorFor("graphSnapshot", "graph")
       }),
     grad: (loss, wrt) =>
       Effect.try({
